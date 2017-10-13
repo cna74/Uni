@@ -55,7 +55,7 @@ def declare(entry):
                         print(f'{er} string {P}:: {c_str[1:-1]}{W} contain extra quote')
                     else:
                         db[tmp.group('var')] = [tmp.group('type'), c_str[1:-1]]
-                        print(f'{ok} {G}string {C}{tmp.group("var")}{W} = {c_str[1:-1]}{W}')
+                        print(f'{ok} {G}string {P}{tmp.group("var")}{W} = {B}{c_str[1:-1]}{W}')
 
                 # numeric
                 elif str(tmp.group('type')) == 'int' or 'float' or 'double':
@@ -66,6 +66,7 @@ def declare(entry):
                         print(f'{er} too mani dot {P}:: {c_int}{W}')
                     elif re.search(r'(\d+\.?)', c_int) and re.match(r'(float|double)', tmp.group('type')):
                         if not re.search(r'(\.(?=\d+)|(?<=\d)\.)', c_int):
+                            c_int = str(c_int) + '.0'
                             db[tmp.group('var')] = [tmp.group('type'), c_int]
                             print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")} = {B}{c_int}{W}')
                         else:
@@ -77,12 +78,12 @@ def declare(entry):
                                 val = c_int
                             db[tmp.group('var')] = [tmp.group('type'), val]
                             print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")}{W} = {B}{val}{W}')
-                    elif re.match(r'\d+', str(tmp.group('num'))) and re.fullmatch(r'int', tmp.group('type')):
+                    elif re.fullmatch(r'\d+', str(tmp.group('num'))) and re.fullmatch(r'int', tmp.group('type')):
                         if re.search(r'\.', tmp.group('num')):
                             print(f"{er} {P}:: {entry}{W} can't define a int with float number")
                         else:
                             db[tmp.group('var')] = [tmp.group('type'), c_int]
-                            print(f'{ok} {G}{tmp.group("type")} {C}{tmp.group("var")} = {B}{c_int}{W}')
+                            print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")} = {B}{c_int}{W}')
             else:
                 print(f'{er} {P}:: {entry}{W} invalid syntax')
         else:
@@ -122,9 +123,25 @@ def equivalent(entry):
         return False
 
 
+def xform(entry):
+    if len(str(entry)) % 2 == 0:
+        ppp = int((15 - len(str(entry)))/2) + 1
+    else:
+        ppp = int((15 - len(str(entry)))/2)
+
+    lll = ' ' * ppp
+
+    return lll+str(entry)+lll if len(str(entry)) % 2 == 0 else lll+str(entry)+lll+' '
+
+
+event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";',
+         'double temp = 13;', 'string operator = "SEMI";', 'report')
+i = 0
 # start
-while True:
-    code = input(':\n').strip()
+print(f'\nif you ever wanted see database type: {C}REPORT{W}')
+while i < len(event):
+    # code = input(':\n').strip()
+    code = event[i]
     # define
     if declare(code):
         pass
@@ -173,6 +190,10 @@ while True:
                     print('{}ERROR::{} check your loop again {}{}{} something is wrong'.format(
                         er, W, P, ' '.join(code.split()), W))
 
+    elif re.fullmatch(r'report', code, re.I):
+        print(f'{P} ...VARIABLE... {W}||{G} .... TYPE .... {W}||{B}  ... VALUE ...  {W}')
+        for k, v in db.items():
+            print(f'{P}{xform(k)}{G}{xform(v[0])}{B}{xform(v[1])}{W}')
     else:
         print(f'{er} unknown token {P}{code}{W} please start with a valid token')
-    print(db)
+    i+=1
