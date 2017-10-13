@@ -7,7 +7,7 @@ er, ok = "\033[31;1;4m"+"ERROR::"+W, "\033[34;1;4m"+"OK::"+W
 # region re
 define = re.compile(r'(?P<type>int|float|double|string)\s+'
                     r'(?P<var>\S+)\s*'
-                    r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\'\"][\S\d\s]*[\'\"]))))\s*;')
+                    r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\"][\S\d\s]*[\"]))))\s*;')
 equal = re.compile(r'(?P<left>\S+)\s+=\s*'
                    r'(?P<right>\.?\d+\.?\d?|\S+)'
                    r'\s*;$', re.I)
@@ -25,13 +25,9 @@ loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
 db = {}
 
 
-def variable(tmp):
-    if re.match(r'[_0-9]', str(tmp.group('var'))):
-        print(f"{er} {P}:: {tmp.group('var')}{W} don't start variables with {P}'_ 0..9'{W}")
-        return True
-    elif not tmp.group('op'):
-        db[tmp.group('var')] = [tmp.group('type'), '']
-        print(f'{ok} {G}{tmp.group("type")} {C}{tmp.group("var")} {W}')
+def variable(entry):
+    if re.match(r'[_0-9]', entry):
+        print(f"{er} {P}:: {entry}{W} don't start variables with {G}'_ 0..9'{W}")
         return True
     else:
         return False
@@ -43,8 +39,11 @@ def declare(entry):
             tmp = re.search(define, entry) if re.search(define, entry) else None
             if tmp:
                 # variables ERROR
-                if variable(tmp=tmp):
-                    return True
+                if variable(str(tmp.group('var'))):
+                    pass
+                elif not tmp.group('op'):
+                    db[tmp.group('var')] = [tmp.group('type'), '']
+                    print(f'{ok} {G}{tmp.group("type")} {C}{tmp.group("var")}{W}')
                 # string
                 elif str(tmp.group('type')) == 'string':
                     c_str = tmp.group('string')
@@ -52,10 +51,10 @@ def declare(entry):
                         print(f"{er} {P}{entry}{W} check the {P}variable-type{W} with the {P}value{W}")
                     elif not c_str[0] == c_str[-1]:
                         print(f"{er} {P}:: {c_str} {W}string quote's ain't match together")
-                    elif re.search(r'([\']|[\"])', c_str[1:-1]):
+                    elif re.search(r'\"', c_str[1:-1]):
                         print(f'{er} string {P}:: {c_str[1:-1]}{W} contain extra quote')
                     else:
-                        db[tmp.group('var')] = {tmp.group('type'), c_str[1:-1]}
+                        db[tmp.group('var')] = [tmp.group('type'), c_str[1:-1]]
                         print(f'{ok} {G}string {C}{tmp.group("var")}{W} = {c_str[1:-1]}{W}')
 
                 # numeric
@@ -70,9 +69,9 @@ def declare(entry):
                             db[tmp.group('var')] = [tmp.group('type'), c_int]
                             print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")} = {B}{c_int}{W}')
                         else:
-                            if tmp.group('num').startswith('.'):
+                            if str(tmp.group('num')).startswith('.'):
                                 val = '0' + c_int
-                            elif tmp.group('num').endswith('.'):
+                            elif str(tmp.group('num')).endswith('.'):
                                 val = c_int + '0'
                             else:
                                 val = c_int
@@ -87,28 +86,38 @@ def declare(entry):
             else:
                 print(f'{er} {P}:: {entry}{W} invalid syntax')
         else:
-            print(f'{er} {P}:: {entry} {W} semicolon missing')
+            print(f'{er} {P}:: {entry}{W} semicolon missing')
+        return True
+    else:
+        return False
 
 
 def equivalent(entry):
-    tmp = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else print('no')
+    tmp = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else None
     if tmp:
         assign = tmp.group('right')
-        if db[tmp.group('left')][0] == 'int':
-            if re.search(r'(\d+\.?)', assign):
-                if not re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
-                    db['left'][1] = tmp.group('right')
-                else:
-                    if tmp.group('right').startswith('.'):
-                        val = '0' + assign
-                    elif tmp.group('right').endswith('.'):
-                        val = assign + '0'
-                    else:
-                        val = assign
-                    print(val)
-    # if db[tmp.group('left')][0] == 'int':
-    #     db[tmp.group('left')][1] = tmp.group('right')
-    #     return True
+        if variable(str(assign)):
+            pass
+        elif re.fullmatch(r'int', db[tmp.group('left')][0]) and re.fullmatch(r'(\d+)', assign):
+            db[tmp.group('left')][1] = tmp.group('right')
+        elif re.fullmatch(r'(float|double)', db[tmp.group('left')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
+            if tmp.group('right').startswith('.'):
+                val = '0' + assign
+            elif tmp.group('right').endswith('.'):
+                val = assign + '0'
+            else:
+                val = assign
+            db[tmp.group('left')][1] = val
+        elif re.fullmatch(r'string', db[tmp.group('left')][0]):
+            if not assign[0] == assign[-1] == '"':
+                print(f"{er} {P}:: {assign} {W}string quote's ain't match together")
+            elif re.search(r'\"', assign[1:-1]):
+                print(f'{er} string {P}:: {assign[1:-1]}{W} contain extra quote')
+            else:
+                db[tmp.group('left')][1] = assign[1:-1]
+        else:
+            print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{tmp.group('left')}{W}'s type")
+        return True
     else:
         return False
 
