@@ -93,18 +93,18 @@ def declare(entry):
 def equivalent(entry):
     tmp = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else print('no')
     if tmp:
+        assign = tmp.group('right')
         if db[tmp.group('left')][0] == 'int':
-            c_int = tmp.group('right')
-            if re.search(r'(\d+\.?)', c_int):
-                if not re.search(r'(\.(?=\d+)|(?<=\d)\.)', c_int):
+            if re.search(r'(\d+\.?)', assign):
+                if not re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
                     db['left'][1] = tmp.group('right')
                 else:
                     if tmp.group('right').startswith('.'):
-                        val = '0' + c_int
+                        val = '0' + assign
                     elif tmp.group('right').endswith('.'):
-                        val = c_int + '0'
+                        val = assign + '0'
                     else:
-                        val = c_int
+                        val = assign
                     print(val)
     # if db[tmp.group('left')][0] == 'int':
     #     db[tmp.group('left')][1] = tmp.group('right')
