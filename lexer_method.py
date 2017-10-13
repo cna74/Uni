@@ -113,6 +113,7 @@ def equivalent(entry):
         return False
 
 
+# start
 while True:
     code = input(':\n').strip()
     # define
