@@ -9,7 +9,7 @@ define = re.compile(r'(?P<type>int|float|double|string)\s+'
                     r'(?P<var>\S+)\s*'
                     r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\"][\S\s]*[\"]))))\s*;')
 equal = re.compile(r'(?P<left>\S+)\s+=\s*'
-                   r'(?P<right>\.?\d+\.?\d?|[\"][\S\d\s]*[\"])'
+                   r'(?P<right>\.?\d+\.?\d*|[\"][\S\d\s]*[\"]|\S*)'
                    r'\s*;$', re.I)
 condition = re.compile(r'if\s*\(\s*(?P<left>[a-z]+[0-9_]*[a-z]*|\.?\d+\.?\d*)'
                        r'\s*(?P<op>==|!=|>=|<=|>|<)\s*'
@@ -36,17 +36,17 @@ def variable(entry):
 def declare(entry):
     if entry.startswith(('int', 'float', 'double', 'string')):
         if entry.endswith(';'):
-            tmp = re.search(define, entry) if re.search(define, entry) else None
-            if tmp:
+            create = re.search(define, entry) if re.search(define, entry) else None
+            if create:
                 # variables ERROR
-                if variable(str(tmp.group('var'))):
+                if variable(str(create.group('var'))):
                     pass
-                elif not tmp.group('op'):
-                    db[tmp.group('var')] = [tmp.group('type'), '']
-                    print(f'{ok} {G}{tmp.group("type")} {B}{tmp.group("var")}{W}')
+                elif not create.group('op'):
+                    db[create.group('var')] = [create.group('type'), '']
+                    print(f'{ok} {G}{create.group("type")} {B}{create.group("var")}{W}')
                 # string
-                elif str(tmp.group('type')) == 'string':
-                    c_str = tmp.group('string')
+                elif str(create.group('type')) == 'string':
+                    c_str = create.group('string')
                     if not c_str:
                         print(f"{er} {P}{entry}{W} check the {P}variable-type{W} with the {P}value{W}")
                     elif not (c_str[0] == '"' and c_str[-1] == '"'):
@@ -54,36 +54,36 @@ def declare(entry):
                     elif re.search(r'\"', c_str[1:-1]):
                         print(f'{er} string {P}:: {c_str[1:-1]}{W} contain extra quote')
                     else:
-                        db[tmp.group('var')] = [tmp.group('type'), c_str[1:-1]]
-                        print(f"{ok} {G}{tmp.group('type')} {P}{tmp.group('var')}{W} = {B}{c_str[1:-1]}{W}")
+                        db[create.group('var')] = [create.group('type'), c_str[1:-1]]
+                        print(f"{ok} {G}{create.group('type')} {P}{create.group('var')}{W} = {B}{c_str[1:-1]}{W}")
 
                 # numeric
-                elif str(tmp.group('type')) == 'int' or 'float' or 'double':
-                    c_int = tmp.group('num')
+                elif str(create.group('type')) == 'int' or 'float' or 'double':
+                    c_int = create.group('num')
                     if not c_int:
                         print(f"{er} {P}:: {entry}{W} check the {P}variable-type{W} with the {P}value{W}")
                     elif re.search(r'([.]+\d*[.]+)', c_int):
                         print(f'{er} too mani dot {P}:: {c_int}{W}')
-                    elif re.search(r'(\d+\.?)', c_int) and re.match(r'(float|double)', tmp.group('type')):
+                    elif re.search(r'(\d+\.?)', c_int) and re.match(r'(float|double)', create.group('type')):
                         if not re.search(r'(\.(?=\d+)|(?<=\d)\.)', c_int):
                             c_int = str(c_int) + '.0'
-                            db[tmp.group('var')] = [tmp.group('type'), c_int]
-                            print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")}{W} = {B}{c_int}{W}')
+                            db[create.group('var')] = [create.group('type'), c_int]
+                            print(f'{ok} {G}{create.group("type")} {P}{create.group("var")}{W} = {B}{c_int}{W}')
                         else:
-                            if str(tmp.group('num')).startswith('.'):
+                            if str(create.group('num')).startswith('.'):
                                 val = '0' + c_int
-                            elif str(tmp.group('num')).endswith('.'):
-                                val = c_int + '0'
+                            elif str(create.group('num')).endswith('.'):
+                                val = str(c_int) + '0'
                             else:
                                 val = c_int
-                            db[tmp.group('var')] = [tmp.group('type'), val]
-                            print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")}{W} = {B}{val}{W}')
-                    elif re.fullmatch(r'\d+', str(tmp.group('num'))) and re.fullmatch(r'int', tmp.group('type')):
-                        if re.search(r'\.', tmp.group('num')):
+                            db[create.group('var')] = [create.group('type'), val]
+                            print(f'{ok} {G}{create.group("type")} {P}{create.group("var")}{W} = {B}{val}{W}')
+                    elif re.fullmatch(r'\d+', str(create.group('num'))) and re.fullmatch(r'int', create.group('type')):
+                        if re.search(r'\.', create.group('num')):
                             print(f"{er} {P}:: {entry}{W} can't define a int with float number")
                         else:
-                            db[tmp.group('var')] = [tmp.group('type'), c_int]
-                            print(f'{ok} {G}{tmp.group("type")} {P}{tmp.group("var")}{W} = {B}{c_int}{W}')
+                            db[create.group('var')] = [create.group('type'), c_int]
+                            print(f'{ok} {G}{create.group("type")} {P}{create.group("var")}{W} = {B}{c_int}{W}')
             else:
                 print(f'{er} {P}:: {entry}{W} invalid syntax')
         else:
@@ -94,42 +94,47 @@ def declare(entry):
 
 
 def equivalent(entry):
-    tmp = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else None
-    if tmp:
-        assign = tmp.group('right')
+    eq = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else None
+    if eq:
+        assign = eq.group('right')
         # value = tmp.group('right')
-        if variable(tmp.group('left')):
+        if variable(eq.group('left')):
             pass
-        elif not db.get(tmp.group('left')):
-            print(f"{er} {P}:: {tmp.group('left')}{W} not exist in database for info type: {C}REPORT{W}")
-
-        elif re.fullmatch(r'([\d.]|\d)+', assign) and re.fullmatch(r'(int|float|double)', db[tmp.group('left')][0]):
+        elif not db.get(eq.group('left')):
+            print(f"{er} {P}:: {eq.group('left')}{W} not exist in database for info type: {C}REPORT{W}")
+        elif db.get(assign):
+            if db[eq.group('left')][0] == db[assign][0]:
+                print(f"{ok} {P}{eq.group('left')}{W} = {B}{eq.group('right')}{W}")
+            else:
+                print(f"{er} {P}:: {code}{W} {eq.group('left')} and {assign} aren't same object,"
+                      f" {R}{db[eq.group('left')][0]} != {db[assign][0]}{W}")
+        elif re.fullmatch(r'([\d.]|\d)+', assign) and re.fullmatch(r'(int|float|double)', db[eq.group('left')][0]):
             # NUMERIC
-            if re.fullmatch(r'int', db[tmp.group('left')][0]) and re.fullmatch(r'(\d+)', assign):
-                db[tmp.group('left')][1] = tmp.group('right')
-                print(f"{ok} {B}{tmp.group('left')}{W} = {tmp.group('right')}")
-            elif re.fullmatch(r'(float|double)', db[tmp.group('left')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
-                if tmp.group('right').startswith('.'):
+            if re.fullmatch(r'int', db[eq.group('left')][0]) and re.fullmatch(r'(\d+)', assign):
+                db[eq.group('left')][1] = eq.group('right')
+                print(f"{ok} {B}{eq.group('left')}{W} = {eq.group('right')}")
+            elif re.match(r'(float|double)', db[eq.group('left')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
+                if eq.group('right').startswith('.'):
                     val = '0' + assign
-                elif tmp.group('right').endswith('.'):
+                elif eq.group('right').endswith('.'):
                     val = assign + '0'
                 else:
                     val = assign
-                db[tmp.group('left')][1] = val
-                print(f"{ok} {P}{tmp.group('left')}{W} = {B}{tmp.group('right')}{W}")
+                db[eq.group('left')][1] = val
+                print(f"{ok} {P}{eq.group('left')}{W} = {B}{eq.group('right')}{W}")
             else:
-                print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{tmp.group('left')}{W}'s type")
+                print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{eq.group('left')}{W}'s type")
         # STRING
-        elif re.fullmatch(r'([\"][\s\S]*[\"])', assign) and re.fullmatch(r'string', db[tmp.group('left')][0]):
+        elif re.fullmatch(r'([\"][\s\S]*[\"])', assign) and re.fullmatch(r'string', db[eq.group('left')][0]):
             if not (assign[0] == '"' and assign[-1] == '"'):
                 print(f"{er} {P}:: {assign} {W}string quote's ain't match together")
             elif re.search(r'\"', assign[1:-1]):
                 print(f'{er} string {P}:: {assign[1:-1]}{W} contain extra quote')
             else:
-                db[tmp.group('left')][1] = assign[1:-1]
-                print(f"{ok} {P}{tmp.group('left')}{W} = {B}{assign[1:-1]}{W}")
+                db[eq.group('left')][1] = assign[1:-1]
+                print(f"{ok} {P}{eq.group('left')}{W} = {B}{assign[1:-1]}{W}")
         else:
-            print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{tmp.group('left')}{W}'s type")
+            print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{eq.group('left')}{W}'s type")
         return True
 
 
@@ -143,7 +148,8 @@ def xform(entry):
 
 
 event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";', 'double temp = 13;', 'string operator = "SE M1I";',
-         'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'report')
+         'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'z = operator;', 'x12 = y2;',
+         'report')
 i = 0
 # start
 print(f'\nif you ever wanted see database type: {C}REPORT{W}')
