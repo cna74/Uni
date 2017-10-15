@@ -7,7 +7,7 @@ er, ok = "\033[31;1;4m"+"ERROR::"+W, "\033[34;1;4m"+"OK::"+W
 # region re
 define = re.compile(r'(?P<type>int|float|double|string)\s+'
                     r'(?P<var>\S+)\s*'
-                    r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\"][\S\d\s]*[\"]))))\s*;')
+                    r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\"][\S\s]*[\"]))))\s*;')
 equal = re.compile(r'(?P<left>\S+)\s+=\s*'
                    r'(?P<right>\.?\d+\.?\d?|[\"][\S\d\s]*[\"])'
                    r'\s*;$', re.I)
@@ -43,19 +43,19 @@ def declare(entry):
                     pass
                 elif not tmp.group('op'):
                     db[tmp.group('var')] = [tmp.group('type'), '']
-                    print(f'{ok} {G}{tmp.group("type")} {C}{tmp.group("var")}{W}')
+                    print(f'{ok} {G}{tmp.group("type")} {B}{tmp.group("var")}{W}')
                 # string
                 elif str(tmp.group('type')) == 'string':
                     c_str = tmp.group('string')
                     if not c_str:
                         print(f"{er} {P}{entry}{W} check the {P}variable-type{W} with the {P}value{W}")
-                    elif not c_str[0] == c_str[-1]:
+                    elif not (c_str[0] == '"' and c_str[-1] == '"'):
                         print(f"{er} {P}:: {c_str} {W}string quote's ain't match together")
                     elif re.search(r'\"', c_str[1:-1]):
                         print(f'{er} string {P}:: {c_str[1:-1]}{W} contain extra quote')
                     else:
                         db[tmp.group('var')] = [tmp.group('type'), c_str[1:-1]]
-                        print(f'{ok} {G}string {P}{tmp.group("var")}{W} = {B}{c_str[1:-1]}{W}')
+                        print(f"{ok} {G}{tmp.group('type')} {P}{tmp.group('var')}{W} = {B}{c_str[1:-1]}{W}")
 
                 # numeric
                 elif str(tmp.group('type')) == 'int' or 'float' or 'double':
@@ -97,57 +97,60 @@ def equivalent(entry):
     tmp = re.fullmatch(equal, entry) if re.fullmatch(equal, entry) else None
     if tmp:
         assign = tmp.group('right')
+        # value = tmp.group('right')
         if variable(tmp.group('left')):
             pass
         elif not db.get(tmp.group('left')):
             print(f"{er} {P}:: {tmp.group('left')}{W} not exist in database for info type: {C}REPORT{W}")
-        elif re.fullmatch(r'int', db[tmp.group('left')][0]) and re.fullmatch(r'(\d+)', assign):
-            db[tmp.group('left')][1] = tmp.group('right')
-            print(f"{ok} {B}{tmp.group('left')}{W} = {tmp.group('right')}")
-        elif re.fullmatch(r'(float|double)', db[tmp.group('left')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
-            if tmp.group('right').startswith('.'):
-                val = '0' + assign
-            elif tmp.group('right').endswith('.'):
-                val = assign + '0'
+
+        elif re.fullmatch(r'([\d.]|\d)+', assign) and re.fullmatch(r'(int|float|double)', db[tmp.group('left')][0]):
+            # NUMERIC
+            if re.fullmatch(r'int', db[tmp.group('left')][0]) and re.fullmatch(r'(\d+)', assign):
+                db[tmp.group('left')][1] = tmp.group('right')
+                print(f"{ok} {B}{tmp.group('left')}{W} = {tmp.group('right')}")
+            elif re.fullmatch(r'(float|double)', db[tmp.group('left')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
+                if tmp.group('right').startswith('.'):
+                    val = '0' + assign
+                elif tmp.group('right').endswith('.'):
+                    val = assign + '0'
+                else:
+                    val = assign
+                db[tmp.group('left')][1] = val
+                print(f"{ok} {P}{tmp.group('left')}{W} = {B}{tmp.group('right')}{W}")
             else:
-                val = assign
-            db[tmp.group('left')][1] = val
-        elif re.fullmatch(r'string', db[tmp.group('left')][0]):
-            if not assign[0] == assign[-1]:
+                print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{tmp.group('left')}{W}'s type")
+        # STRING
+        elif re.fullmatch(r'([\"][\s\S]*[\"])', assign) and re.fullmatch(r'string', db[tmp.group('left')][0]):
+            if not (assign[0] == '"' and assign[-1] == '"'):
                 print(f"{er} {P}:: {assign} {W}string quote's ain't match together")
             elif re.search(r'\"', assign[1:-1]):
                 print(f'{er} string {P}:: {assign[1:-1]}{W} contain extra quote')
             else:
                 db[tmp.group('left')][1] = assign[1:-1]
-                print(f"{ok} {B}{tmp.group('left')}{W} = {tmp.group('right')}")
+                print(f"{ok} {P}{tmp.group('left')}{W} = {B}{assign[1:-1]}{W}")
         else:
             print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{tmp.group('left')}{W}'s type")
         return True
-    else:
-        return False
 
 
 def xform(entry):
     if len(str(entry)) % 2 == 0:
-        ppp = int((15 - len(str(entry)))/2) + 1
+        ppp = int((21 - len(str(entry)))/2) + 1
     else:
-        ppp = int((15 - len(str(entry)))/2)
+        ppp = int((21 - len(str(entry)))/2)
     lll = '_' * ppp
     return lll+str(entry)+lll if len(str(entry)) % 2 == 0 else lll+str(entry)+lll+'_'
 
 
-event = ('int x12 = 10;', 'float y2 = 20;',
-         'string z = "RHN";', 'double temp = 13;',
-         'string operator = "SEMI";', 'string aaa;',
-         'aa = "RHN";', 'aaa = "sina";', 'z = 10;',
-         'report')
+event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";', 'double temp = 13;', 'string operator = "SE M1I";',
+         'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'report')
 i = 0
 # start
-print(f'\nif you ever wanted see database type: {C}REPORT{W}\n')
+print(f'\nif you ever wanted see database type: {C}REPORT{W}')
 while i < len(event):
     # code = input(':\n').strip()
     code = event[i].strip()
-    print('\n', i, code, end='\n')
+    print('\n', i, ':', code, end='\n')
     # define
     if declare(code):
         pass
@@ -197,7 +200,7 @@ while i < len(event):
                         er, W, P, ' '.join(code.split()), W))
 
     elif re.fullmatch(r'report', code, re.I):
-        print(f'\n{P} ...VARIABLE... {W}||{G} .... TYPE .... {W}||{B}  ... VALUE ...  {W}')
+        print(f'\n{P} . . . VARIABLE . . . {W}||{G} . . . . TYPE . . . . {W}||{B}  . . . VALUE . . .  {W}')
         for k, v in db.items():
             print(f'{P}{xform(k)}{G}  {xform(v[0])}{B}  {xform(v[1])}{W}')
     else:
