@@ -6,12 +6,12 @@ er, ok = "\033[31;1;4m"+"ERROR::"+W, "\033[34;1;4m"+"OK::"+W
 
 # region re
 define = re.compile(r'(?P<type>int|float|double|string)\s+'
-                    r'(?P<var>\S+)\s*'
+                    r'(?P<var>[^=\s*]+)\s*'
                     r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|\s*(?P<string>[\"][\S\s]*[\"]))))\s*;')
-equal = re.compile(r'(?P<left>\S+)\s+=\s*'
+equal = re.compile(r'(?P<left>[^=\s*])\s+(?P<op>=)\s*'
                    r'(?P<right>\.?\d+\.?\d*|[\"][\S\d\s]*[\"]|\S*)'
                    r'\s*;$', re.I)
-condition = re.compile(r'if\s*\(\s*(?P<left>[a-z]+[0-9_]*[a-z]*|\.?\d+\.?\d*)'
+condition = re.compile(r'if\s*\(\s*(?P<left>([\S^=])*\s*(?=\=)|\.?\d+\.?\d*)'
                        r'\s*(?P<op>==|!=|>=|<=|>|<)\s*'
                        r'(?P<right>\.?\d+\.?\d*|[a-z]+[0-9_]*[a-z]*)\s*\)\s*((:?)|{)$', re.M)
 loop_for = re.compile(r'for\s*\(\s*int\s+([a-z]+[0-9_]*[a-z]*)\s*=(\d*)\s*;\s*([a-z]+[0-9_]*[a-z]*)'
@@ -22,12 +22,17 @@ loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
                         r'[0-9.]+\s*\)?:$', re.I)
 # endregion
 
+# region database
 db = {}
+# endregion
 
 
 def variable(entry):
-    if re.match(r'[_0-9]', entry):
-        print(f"{er} {P}:: {entry}{W} don't start variables with {G}'_ 0..9'{W}")
+    if re.match(r'[\-_!@#$%^&*+()=\'".0-9]', entry):
+        print(f"{er} {P}:: {entry}{W} don't start variables with {G}'_ 0..9 or symbols'{W}")
+        return True
+    elif re.search(r'[\-!@#$%^&*+=()"\']', entry):
+        print(f"{er} {P}:: {entry}{W} don't use illegal chars in variables {G}'\"!@#$%^&*()+-={W}")
         return True
     else:
         return False
@@ -39,6 +44,7 @@ def declare(entry):
             create = re.search(define, entry) if re.search(define, entry) else None
             if create:
                 # variables ERROR
+                print(create.group('var'))
                 if variable(str(create.group('var'))):
                     pass
                 elif not create.group('op'):
@@ -147,16 +153,16 @@ def xform(entry):
     return lll+str(entry)+lll if len(str(entry)) % 2 == 0 else lll+str(entry)+lll+'_'
 
 
-event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";', 'double temp = 13;', 'string operator = "SE M1I";',
-         'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'z = operator;', 'x12 = y2;',
-         'report')
+# event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";', 'double temp = 13;', 'string operator = "SE M1I";',
+#          'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'z = operator;', 'x12 = y2;',
+#          'report')
 i = 0
-# start
 print(f'\nif you ever wanted see database type: {C}REPORT{W}')
-while i < len(event):
+while True:
     # code = input(':\n').strip()
-    code = event[i].strip()
-    print('\n', i, ':', code, end='\n')
+    # code = event[i].strip()
+    code = input(':\t').strip()
+    # print(i, ':', end='\n')
     # define
     if declare(code):
         pass
