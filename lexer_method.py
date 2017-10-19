@@ -79,6 +79,8 @@ def if_cond(entry):
                     print(f"{er} {P}:: {if_c.group('left')}{W} undefined variable")
                 elif not if_c.group('op') in ('==', '>=', '<=', '!=', '<', '>'):
                     print(f"{er} {P}:: {if_c.group('op')}{W} is wrong, use one of these {G}==, >=, <=, !=, >, <{W}")
+                if not db.get(if_c.group('right')):
+                    print(f"{er} {P}:: {if_c.group('right')}{W} undefined variable")
                 elif re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', if_c.group('left')) or \
                         re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', if_c.group('right')):
                     left, right = float(if_c.group('left')), float(if_c.group('right'))
