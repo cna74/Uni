@@ -15,9 +15,9 @@ define = re.compile(r'(?P<type>int|float|double|string|char)\s+'
                     r'\s*(?P<math>[\d.]+\s*[+*\-/%]\s*[\d.]+))))\s*;')
 equal = re.compile(r'(?P<var>[^=\s*]+)\s*=\s*'
                    r'(?P<right>\.?\d+\.?\d*|'
-                   r'[\"\'][\S\s]*[\"\']|'
+                   r'\s*(?P<strmath>(?P<one>[\"][\S\s]*[\"])\s*((?P<mul>[*])\s*(?P<to>[\d]+)|(?P<add>[+])\s*(?P<by>[\"][\S\s]*[\"])))|'
                    r'\s*(?P<math>[\d.]+\s*[+*\-/%]\s*[\d.]+)|'
-                   r'\S*(?P<strmath>(?P<one>[\"][\S\s]*[\"])\s*((?P<mul>[*])\s*(?P<to>[\d]+)|(?P<add>[+])\s*(?P<by>[\"][\S\s]*[\"]))))'
+                   r'[\"\'][\S\s]*[\"\'])'
                    r'\s*;$', re.I)
 condition = re.compile(r'if\s*\(\s*(?P<left>[^=\s]+|\.?\d+\.?\d*)'
                        r'\s*(?P<op>[=<>!]+)\s*(?P<right>\.?\d+\.?\d*|[^=\s]+)\s*\)\s*((:?)|{)$', re.I)
@@ -31,8 +31,6 @@ loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
 
 # region database
 db = {}
-
-
 # endregion
 
 
@@ -49,25 +47,38 @@ def variable(entry):
 
 
 def mth(entry, tip=True):
-    if entry.group('math'):
-        db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
-        print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
-    elif entry.group('strmath'):
+    if entry.group('math') and tip is False:
+        if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(eval(entry.group('math')))):
+            db[entry.group('var')][1] = int(eval(entry.group('math')))
+            print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
+        elif db[entry.group('var')][0] in ('float', 'double'):
+            db[entry.group('var')][1] = float(eval(entry.group('math')))
+            print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
+        else:
+            print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
+        return True
+    elif entry.group('math') and tip is True:
+        if entry.group('type') in ('float', 'double'):
+            db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
+            print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
+        elif entry.group('type') == 'int':
+            db[entry.group('var')] = [entry.group('type'), int(eval(entry.group('math')))]
+            print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
+        return True
+    elif entry.group('strmath') and db[entry.group('var')][0] == 'string':
         if entry.group('mul') and int(entry.group('to')) > 0 and tip:
             db[entry.group('var')] = [entry.group('type'), str(entry.group('one'))[1:-1] * int(entry.group('to'))]
-            print(str(entry.group('one'))[1:-1] * int(entry.group('to')))
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] * int(entry.group('to'))}{W}")
         elif entry.group('mul') and int(entry.group('to')) > 0 and not tip:
             db[entry.group('var')][1] = str(entry.group('one'))[1:-1] * int(entry.group('to'))
-            print(str(entry.group('one'))[1:-1] * int(entry.group('to')))
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] * int(entry.group('to'))}{W}")
         elif entry.group('add') and entry.group('by') and tip:
             db[entry.group('var')] = [entry.group('type'), str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]]
-            print(str(entry.group('one'))[1:-1] + entry.group('by')[1:-1])
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]}{W}")
         elif entry.group('add') and entry.group('by') and not tip:
             db[entry.group('var')][1] = str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]
-            print(str(entry.group('one'))[1:-1] + entry.group('by')[1:-1])
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]}{W}")
         return True
-    else:
-        return False
 
 
 def if_cond(entry):
