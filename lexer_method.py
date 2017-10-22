@@ -48,7 +48,7 @@ def variable(entry):
 
 def mth(entry, tip=True):
     if entry.group('math') and tip is False:
-        if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(eval(entry.group('math')))):
+        if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(entry.group('math'))):
             db[entry.group('var')][1] = int(eval(entry.group('math')))
             print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
         elif db[entry.group('var')][0] in ('float', 'double'):
@@ -61,9 +61,11 @@ def mth(entry, tip=True):
         if entry.group('type') in ('float', 'double'):
             db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
             print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
-        elif entry.group('type') == 'int':
+        elif entry.group('type') == 'int' and not re.search(r'\.', str(entry.group('math'))):
             db[entry.group('var')] = [entry.group('type'), int(eval(entry.group('math')))]
             print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
+        else:
+            print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
         return True
     elif entry.group('strmath') and db[entry.group('var')][0] == 'string':
         if entry.group('mul') and int(entry.group('to')) > 0 and tip:
