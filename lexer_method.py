@@ -1,24 +1,26 @@
 import re
 
-# region colors
+# region vars
 G, W, R, B, C, P = "\033[32;1m", "\033[37;1;0m", "\033[31;1m", "\033[34;1m", "\033[36;1m", "\033[35;1m"
 er, ok = "\033[31;1;4m" + "ERROR::" + W, "\033[34;1;4m" + "OK::" + W
+db = {}
 # endregion
 
 # region re
 define = re.compile(r'(?P<type>int|float|double|string|char)\s+'
                     r'(?P<var>[^=\s]+)\s*'
-                    r'(\s*|((?P<op>=)(\s*(?P<num>[0-9.]+)|'
-                    r'\s*(?P<strmath>(?P<one>[\"][\S\s]*[\"])\s*((?P<mul>[*])\s*(?P<to>[\d]+)|(?P<add>[+])\s*(?P<by>[\"][\S\s]*[\"])))|'
+                    r'(\s*|'
+                    r'((?P<op>=)\s*((?P<num>[0-9.]+)|'
+                    r'\s*(?P<strmath>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[^=\s]+))\s*((?P<mul>[*]|[+])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+))))|'
                     r'\s*(?P<string>[\"][\S\s]*[\"])|'
                     r'\s*(?P<char>[\'][\S\s]*[\'])|'
                     r'\s*(?P<math>[\d.]+\s*[+*\-/%]\s*[\d.]+))))\s*;')
 equal = re.compile(r'(?P<var>[^=\s*]+)\s*=\s*'
                    r'(?P<right>\.?\d+\.?\d*|'
-                   r'\s*(?P<strmath>(?P<one>[\"][\S\s]*[\"])\s*((?P<mul>[*])\s*(?P<to>[\d]+)|(?P<add>[+])\s*(?P<by>[\"][\S\s]*[\"])))|'
-                   r'\s*(?P<math>[\d.]+\s*[+*\-/%]\s*[\d.]+)|'
-                   r'[\"\'][\S\s]*[\"\'])'
-                   r'\s*;$', re.I)
+                   r'(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))\s*(?P<mul>[*+/%\-])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bv>[^=\s]+)|(?P<bn>[\d]+)))|'
+                   r'[\"\'][\S\s]*[\"\']|'
+                   r'[^=\s*]+)'
+                   r'\s*;', re.I)
 condition = re.compile(r'if\s*\(\s*(?P<left>[^=\s]+|\.?\d+\.?\d*)'
                        r'\s*(?P<op>[=<>!]+)\s*(?P<right>\.?\d+\.?\d*|[^=\s]+)\s*\)\s*((:?)|{)$', re.I)
 loop_for = re.compile(r'for\s*\(\s*int\s+([a-z]+[0-9_]*[a-z]*)\s*=(\d*)\s*;\s*([a-z]+[0-9_]*[a-z]*)'
@@ -27,10 +29,6 @@ loop_for = re.compile(r'for\s*\(\s*int\s+([a-z]+[0-9_]*[a-z]*)\s*=(\d*)\s*;\s*([
 loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
                         r'(?P<op>==|!=|>=|<=|>|<)\s*'
                         r'[0-9.]+\s*\)?:$', re.I)
-# endregion
-
-# region database
-db = {}
 # endregion
 
 
@@ -47,39 +45,54 @@ def variable(entry):
 
 
 def mth(entry, tip=True):
-    if entry.group('math') and tip is False:
-        if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(entry.group('math'))):
-            db[entry.group('var')][1] = int(eval(entry.group('math')))
-            print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
-        elif db[entry.group('var')][0] in ('float', 'double'):
-            db[entry.group('var')][1] = float(eval(entry.group('math')))
-            print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
+    # if entry.group('math') and tip is False:
+    #     if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(entry.group('math'))):
+    #         db[entry.group('var')][1] = int(eval(entry.group('math')))
+    #         print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
+    #     elif db[entry.group('var')][0] in ('float', 'double'):
+    #         db[entry.group('var')][1] = float(eval(entry.group('math')))
+    #         print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
+    #     else:
+    #         print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
+    # elif entry.group('math') and tip is True:
+    #     if entry.group('type') in ('float', 'double'):
+    #         db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
+    #         print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
+    #     elif entry.group('type') == 'int' and not re.search(r'\.', str(entry.group('math'))):
+    #         db[entry.group('var')] = [entry.group('type'), int(eval(entry.group('math')))]
+    #         print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
+    #     else:
+    #         print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
+    #         return False
+    if entry.group('strmath'):
+        s1 = s2 = mul = None
+        if entry.group('s11'):
+            s1 = entry.group('s11')[1:-1]
+        elif entry.group('s12'):
+            s1 = entry.group('12')
+        elif entry.group('s13'):
+            s1 = entry.group('s13')
+        mul = str(entry.group('mul'))
+        if entry.group('bs'):
+            s2 = entry.group('bs')[1:-1]
+        elif entry.group('bn'):
+            s2 = entry.group('bn')
+        elif entry.group('bv'):
+            s2 = str(db[entry.group('bv')][1])
+        if mul == '*' and int(s2) > 0 and tip is True and entry.group('type') == 'string':
+            db[entry.group('var')] = [entry.group('type'), s1 * int(s2)]
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 * int(s2)}{W}")
+        elif mul == '+' and s2 and tip is True and entry.group('type') == 'string':
+            db[entry.group('var')] = [entry.group('type'), s1 + s2]
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 + s2}{W}")
+        elif mul == '*' and int(s2) > 0 and tip is False and db.get(entry.group('var'))[0] == 'string':
+            db[entry.group('var')][1] = s1 * int(s2)
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 * int(s2)}{W}")
+        elif mul == '+' and s2 and tip is False and db.get(entry.group('var'))[0] == 'string':
+            db[entry.group('var')][1] = s1 + s2
+            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 + s2}{W}")
         else:
-            print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
-        return True
-    elif entry.group('math') and tip is True:
-        if entry.group('type') in ('float', 'double'):
-            db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
-            print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
-        elif entry.group('type') == 'int' and not re.search(r'\.', str(entry.group('math'))):
-            db[entry.group('var')] = [entry.group('type'), int(eval(entry.group('math')))]
-            print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
-        else:
-            print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
-        return True
-    elif entry.group('strmath') and db[entry.group('var')][0] == 'string':
-        if entry.group('mul') and int(entry.group('to')) > 0 and tip:
-            db[entry.group('var')] = [entry.group('type'), str(entry.group('one'))[1:-1] * int(entry.group('to'))]
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] * int(entry.group('to'))}{W}")
-        elif entry.group('mul') and int(entry.group('to')) > 0 and not tip:
-            db[entry.group('var')][1] = str(entry.group('one'))[1:-1] * int(entry.group('to'))
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] * int(entry.group('to'))}{W}")
-        elif entry.group('add') and entry.group('by') and tip:
-            db[entry.group('var')] = [entry.group('type'), str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]]
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]}{W}")
-        elif entry.group('add') and entry.group('by') and not tip:
-            db[entry.group('var')][1] = str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{str(entry.group('one'))[1:-1] + entry.group('by')[1:-1]}{W}")
+            return False
         return True
 
 
@@ -114,6 +127,8 @@ def declare(entry):
                 # variables ERROR
                 if variable(str(create.group('var'))):
                     pass
+                elif db.get(create.group('var')):
+                    print(f"{er} {P}:: {code}{W} variable {G}{create.group('var')}{W}'s is already defined")
                 elif not create.group('op'):
                     db[create.group('var')] = [create.group('type'), '']
                     print(f'{ok} {G}{create.group("type")} {B}{create.group("var")}{W}')
@@ -200,7 +215,6 @@ def equivalent(entry):
                 print(f"{ok} {eq.group('var')} = {assign}")
             else:
                 print(f"{er} {P}:: {entry}{W} variables ain't match together")
-
         elif not db.get(eq.group('var')):
             print(f"{er} {P}:: {eq.group('var')}{W} not exist in database for info type: {C}REPORT{W}")
         elif db.get(assign):
@@ -214,15 +228,15 @@ def equivalent(entry):
             if re.fullmatch(r'int', db[eq.group('var')][0]) and re.fullmatch(r'(\d+)', assign):
                 db[eq.group('var')][1] = eq.group('right')
                 print(f"{ok} {B}{eq.group('var')}{W} = {eq.group('right')}")
-            elif re.match(r'(float|double)', db[eq.group('var')][0]) and re.search(r'(\.(?=\d+)|(?<=\d)\.)', assign):
+            elif re.match(r'(float|double)', db[eq.group('var')][0]) and re.search(r'([\d.]|[\d])', assign):
                 if eq.group('right').startswith('.'):
                     val = '0' + assign
                 elif eq.group('right').endswith('.'):
                     val = assign + '0'
                 else:
-                    val = assign
+                    val = assign + '.0'
                 db[eq.group('var')][1] = val
-                print(f"{ok} {P}{eq.group('var')}{W} = {B}{eq.group('right')}{W}")
+                print(f"{ok} {P}{eq.group('var')}{W} = {B}{val}{W}")
             else:
                 print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{eq.group('var')}{W}'s type => {R}"
                       f"{db[eq.group('var')][0]}{W}")
@@ -265,17 +279,14 @@ def xform(entry):
 # endregion
 
 
-# event = ('int x12 = 10;', 'float y2 = 20;', 'string z = "RHN";', 'double temp = 13;', 'string operator = "SE M1I";',
-#          'string aaa;', 'aa = "RHN";', 'aaa = "si_-na12";', 'y2 = 1.2;', 'y2 = 10;', 'z = operator;', 'x12 = y2;',
-#          '',
-#          'report')
+event = ('int x;', 'x = 3*2;', 'rt')
 # region start
 i = 0
 print(f'\nif you ever wanted see database type: {C}REPORT{W} or {C}RT{W}')
-while True:
-    # code = event[i].strip()
-    code = input(':\t').strip()
-    # print(i, code, end='\n')
+while i < len(event):
+    code = event[i].strip()
+    # code = input(':\t').strip()
+    print(i+1, code, end='\n')
     # define
     if declare(code):
         pass
@@ -302,7 +313,6 @@ while True:
                 if not re.search(loop_for, code):
                     print('{}ERROR::{} check your loop again {}{}{} something is wrong'.format(
                         er, W, P, ' '.join(code.split()), W))
-
     elif re.fullmatch(r'(report|rt)', code, re.I):
         print(f'\n{P} . . . VARIABLE . . . {W}||{G} . . . . TYPE . . . . {W}||{B}  . . . VALUE . . .  {W}')
         for k, v in db.items():
