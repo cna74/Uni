@@ -11,13 +11,12 @@ define = re.compile(r'(?P<type>int|float|double|string|char)\s+'
                     r'(?P<var>[^=\s]+)\s*'
                     r'(\s*|'
                     r'((?P<op>=)\s*((?P<num>[0-9.]+)|'
-                    r'\s*(?P<strmath>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[^=\s]+))\s*((?P<mul>[*]|[+])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+))))|'
+                    r'\s*(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))\s*(?P<mul>[*+/%\-])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+)))|'
                     r'\s*(?P<string>[\"][\S\s]*[\"])|'
-                    r'\s*(?P<char>[\'][\S\s]*[\'])|'
-                    r'\s*(?P<math>[\d.]+\s*[+*\-/%]\s*[\d.]+))))\s*;')
+                    r'\s*(?P<char>[\'][\S\s]*[\']))))\s*;')
 equal = re.compile(r'(?P<var>[^=\s*]+)\s*=\s*'
                    r'(?P<right>\.?\d+\.?\d*|'
-                   r'(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))\s*(?P<mul>[*+/%\-])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bv>[^=\s]+)|(?P<bn>[\d]+)))|'
+                   r'(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))\s*(?P<mul>[*+/%\-])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+)))|'
                    r'[\"\'][\S\s]*[\"\']|'
                    r'[^=\s*]+)'
                    r'\s*;', re.I)
@@ -45,55 +44,37 @@ def variable(entry):
 
 
 def mth(entry, tip=True):
-    # if entry.group('math') and tip is False:
-    #     if db[entry.group('var')][0] == 'int' and not re.search(r'\.', str(entry.group('math'))):
-    #         db[entry.group('var')][1] = int(eval(entry.group('math')))
-    #         print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
-    #     elif db[entry.group('var')][0] in ('float', 'double'):
-    #         db[entry.group('var')][1] = float(eval(entry.group('math')))
-    #         print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
-    #     else:
-    #         print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
-    # elif entry.group('math') and tip is True:
-    #     if entry.group('type') in ('float', 'double'):
-    #         db[entry.group('var')] = [entry.group('type'), eval(entry.group('math'))]
-    #         print(f"{ok} {entry.group('var')} = {eval(entry.group('math'))}")
-    #     elif entry.group('type') == 'int' and not re.search(r'\.', str(entry.group('math'))):
-    #         db[entry.group('var')] = [entry.group('type'), int(eval(entry.group('math')))]
-    #         print(f"{ok} {entry.group('var')} = {int(eval(entry.group('math')))}")
-    #     else:
-    #         print(f"{er} {P}:: {code}{W}  check the {P}variable-type{W} with the {P}value{W}")
-    #         return False
-    if entry.group('strmath'):
-        s1 = s2 = mul = None
-        if entry.group('s11'):
-            s1 = entry.group('s11')[1:-1]
-        elif entry.group('s12'):
-            s1 = entry.group('12')
-        elif entry.group('s13'):
-            s1 = entry.group('s13')
-        mul = str(entry.group('mul'))
-        if entry.group('bs'):
-            s2 = entry.group('bs')[1:-1]
-        elif entry.group('bn'):
-            s2 = entry.group('bn')
-        elif entry.group('bv'):
-            s2 = str(db[entry.group('bv')][1])
-        if mul == '*' and int(s2) > 0 and tip is True and entry.group('type') == 'string':
-            db[entry.group('var')] = [entry.group('type'), s1 * int(s2)]
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 * int(s2)}{W}")
-        elif mul == '+' and s2 and tip is True and entry.group('type') == 'string':
-            db[entry.group('var')] = [entry.group('type'), s1 + s2]
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 + s2}{W}")
-        elif mul == '*' and int(s2) > 0 and tip is False and db.get(entry.group('var'))[0] == 'string':
-            db[entry.group('var')][1] = s1 * int(s2)
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 * int(s2)}{W}")
-        elif mul == '+' and s2 and tip is False and db.get(entry.group('var'))[0] == 'string':
-            db[entry.group('var')][1] = s1 + s2
-            print(f"{ok} {G}{entry.group('var')}{W} = {C}{s1 + s2}{W}")
-        else:
-            return False
-        return True
+    s1 = s2 = mul = None
+    kind = entry.group('type') if entry.group('type') else db.get(entry.group('var', None))[0]
+    if entry.group('s11'):
+        s1 = entry.group('s11')[1:-1]
+    elif entry.group('s12'):
+        s1 = entry.group('s12')
+    elif entry.group('s13'):
+        s1 = db[entry.group('s13')][1] if db.get(entry.group('s13')) else None
+    mul = str(entry.group('mul'))
+    if entry.group('bs'):
+        s2 = entry.group('bs')[1:-1] if entry.group('bs')[0] == entry.group('bs')[-1] == '"' else None
+    elif entry.group('bn'):
+        s2 = entry.group('bn')
+    elif entry.group('bv'):
+        s2 = str(db[entry.group('bv')][1]) if db.get(entry.group('bv')) else None
+    print(s1, mul, s2)
+    if mul == '*' and s1 and s2.isnumeric() and kind == 'string':
+        print(f"{ok} {G}{s1*int(s2)}{W}")
+        db.update({entry.group('var'): ('string', s1*int(s2))})
+    elif mul == '+' and s1 and s2 and kind == 'string':
+        print(f"{ok} {G}{s1+s2}{W}")
+        db.update({entry.group('var'): ('string', s1+s2)})
+    elif s1.isnumeric() and s2.isnumeric() and kind == 'int':
+        print(f"{ok} {G}{int(eval(entry.group('math')))}{W}")
+        db.update({entry.group('var'): ('int', int(eval(entry.group('math'))))})
+    elif s1 and s2 and kind == 'float':
+        print(f"{ok} {G}{eval(entry.group('math'))}{W}")
+        db.update({entry.group('var'): ('int', float(eval(entry.group('math'))))})
+    else:
+        return False
+    return True
 
 
 def if_cond(entry):
@@ -132,7 +113,7 @@ def declare(entry):
                 elif not create.group('op'):
                     db[create.group('var')] = [create.group('type'), '']
                     print(f'{ok} {G}{create.group("type")} {B}{create.group("var")}{W}')
-                elif mth(create, tip=True):
+                elif create.group('math') and mth(create, tip=True):
                     pass
                 # string
                 elif str(create.group('type')) == 'string':
@@ -207,7 +188,7 @@ def equivalent(entry):
         assign = eq.group('right')
         if variable(eq.group('var')):
             pass
-        elif mth(eq, tip=False):
+        elif eq.group('math') and mth(eq, tip=False):
             pass
         elif db.get(assign):
             if db[eq.group('var')][0] == db[assign][0]:
@@ -278,8 +259,7 @@ def xform(entry):
 
 # endregion
 
-
-event = ('int x;', 'x = 3*2;', 'rt')
+event = ('string x = "sina";', 'float y = 2.3*3;', 'rt')
 # region start
 i = 0
 print(f'\nif you ever wanted see database type: {C}REPORT{W} or {C}RT{W}')
