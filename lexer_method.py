@@ -43,9 +43,12 @@ def variable(entry):
         return False
 
 
-def mth(entry, tip=True):
-    s1 = s2 = mul = None
-    kind = entry.group('type') if entry.group('type') else db.get(entry.group('var', None))[0]
+def ssmk(entry):
+    s1 = s2 = mul = kind = None
+    if db.get(entry.group('var')):
+        kind = db[entry.group('var')][0]
+    elif entry.group('type'):
+        kind = entry.group('type')
     if entry.group('s11'):
         s1 = entry.group('s11')[1:-1]
     elif entry.group('s12'):
@@ -59,19 +62,24 @@ def mth(entry, tip=True):
         s2 = entry.group('bn')
     elif entry.group('bv'):
         s2 = str(db[entry.group('bv')][1]) if db.get(entry.group('bv')) else None
+    return s1, s2, mul, kind
+
+
+def mth(entry):
+    s1, s2, mul, kind = ssmk(entry)
     print(s1, mul, s2)
     if mul == '*' and s1 and s2.isnumeric() and kind == 'string':
-        print(f"{ok} {G}{s1*int(s2)}{W}")
+        print(f"{ok} {P}{entry.group('var')}{W} = {C}{s1*int(s2)}{W}")
         db.update({entry.group('var'): ('string', s1*int(s2))})
     elif mul == '+' and s1 and s2 and kind == 'string':
-        print(f"{ok} {G}{s1+s2}{W}")
+        print(f"{ok} {P}{entry.group('var')}{W} = {C}{s1+s2}{W}")
         db.update({entry.group('var'): ('string', s1+s2)})
-    elif s1.isnumeric() and s2.isnumeric() and kind == 'int':
-        print(f"{ok} {G}{int(eval(entry.group('math')))}{W}")
-        db.update({entry.group('var'): ('int', int(eval(entry.group('math'))))})
+    elif str(s1).isnumeric() and str(s2).isnumeric() and kind == 'int':
+        print(f"{ok} {P}{entry.group('var')}{W} = {C}{int(eval(str(s1)+str(mul)+str(s2)))}{W}")
+        db.update({entry.group('var'): ('int', int(eval(str(s1)+str(mul)+str(s2))))})
     elif s1 and s2 and kind == 'float':
-        print(f"{ok} {G}{eval(entry.group('math'))}{W}")
-        db.update({entry.group('var'): ('int', float(eval(entry.group('math'))))})
+        print(f"{ok} {P}{entry.group('var')}{W} = {C}{float(eval(entry.group('math')))}{W}")
+        db.update({entry.group('var'): ('float', float(eval(entry.group('math'))))})
     else:
         return False
     return True
@@ -113,7 +121,7 @@ def declare(entry):
                 elif not create.group('op'):
                     db[create.group('var')] = [create.group('type'), '']
                     print(f'{ok} {G}{create.group("type")} {B}{create.group("var")}{W}')
-                elif create.group('math') and mth(create, tip=True):
+                elif create.group('math') and mth(create):
                     pass
                 # string
                 elif str(create.group('type')) == 'string':
@@ -188,7 +196,7 @@ def equivalent(entry):
         assign = eq.group('right')
         if variable(eq.group('var')):
             pass
-        elif eq.group('math') and mth(eq, tip=False):
+        elif eq.group('math') and mth(eq):
             pass
         elif db.get(assign):
             if db[eq.group('var')][0] == db[assign][0]:
@@ -237,10 +245,10 @@ def equivalent(entry):
             elif assign[1:-1] == "'":
                 print(f"{er} {P}:: {assign}{W} can't assign => ' <= to char try \"\\'\"")
             elif assign[1:-1] == "\\'":
-                db[eq.group('left')][1] = assign[2:-1]
+                db[eq.group('var')][1] = assign[2:-1]
                 print(f"{ok} {G}{eq.group('var')} = {B}{assign[2:-1]}{W}")
             else:
-                db[eq.group('left')][1] = assign[1:-1]
+                db[eq.group('var')][1] = assign[1:-1]
                 print(f"{ok} {P}{eq.group('var')}{W} = {B}{assign[1:-1]}{W}")
         else:
             print(f"{er} {P}:: {assign}{W} doesn't match with the variable {G}{eq.group('var')}{W}'s type => {R}"
@@ -259,14 +267,15 @@ def xform(entry):
 
 # endregion
 
-event = ('string x = "sina";', 'float y = 2.3*3;', 'rt')
+# event = ('string x = "sina";', 'string y = x*3;', 'string z = x+" rhn";',
+#          'string p;', 'p = x+x;', 'int j = 2*2;', 'float i = 2*3;', 'rt')
 # region start
 i = 0
 print(f'\nif you ever wanted see database type: {C}REPORT{W} or {C}RT{W}')
-while i < len(event):
-    code = event[i].strip()
-    # code = input(':\t').strip()
-    print(i+1, code, end='\n')
+while True:
+    # code = event[i].strip()
+    code = input(':\t').strip()
+    # print(i+1, code, end='\n')
     # define
     if declare(code):
         pass
