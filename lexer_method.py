@@ -16,15 +16,21 @@ define = re.compile(r'(?P<type>int|float|double|string|char)\s+'
                     r'\s*(?P<char>[\'][\S\s]*[\']))))\s*;')
 equal = re.compile(r'(?P<var>[^=\s*]+)\s*=\s*'
                    r'(?P<right>\.?\d+\.?\d*|'
-                   r'(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))\s*(?P<mul>[*+/%\-])\s*((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+)))|'
+                   r'(?P<math>((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))'
+                   r'\s*(?P<mul>[*+/%\-])\s*'
+                   r'((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+)))|'
                    r'[\"\'][\S\s]*[\"\']|'
                    r'[^=\s*]+)'
                    r'\s*;', re.I)
-condition = re.compile(r'if\s*\(\s*(?P<left>[^=\s]+|\.?\d+\.?\d*)'
-                       r'\s*(?P<op>[=<>!]+)\s*(?P<right>\.?\d+\.?\d*|[^=\s]+)\s*\)\s*((:?)|{)$', re.I)
-loop_for = re.compile(r'for\s*\(\s*int\s+([a-z]+[0-9_]*[a-z]*)\s*=(\d*)\s*;\s*([a-z]+[0-9_]*[a-z]*)'
-                      r'\s*(=|<=|>=|!=|<|>)\s*(\d*)\s*;\s*([a-z]+[0-9_]*[a-z]*)\s*'
-                      r'(((?P<one>[+\-*/%])\s*(?P=one))|(?P<two>[+\-*/%]=\s*[0-9]+))\s*\):$', re.I)
+condition = re.compile(r'if\s*\(\s*((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))'
+                       r'\s*(?P<op>[=<>!]+)\s*'
+                       r'((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+))\s*\)\s*'
+                       r'{(?P<stmt>[\s\S]+|\s*)}', re.I)
+loop_for = re.compile(r'for\s*\(\s*'
+                      r'(int\s+(?P<v1>[^=\s]+)\s*=\s*(?P<n1>\d+|[^=\s]+)|(?P<v11>[^=\s]+))\s*;'
+                      r'\s*(?P<v2>[^=\s]+)\s*(?P<op>[=<>!]+)\s*(?P<n2>\d+|[^=\s]+)\s*;'
+                      r'\s*(?P<v3>[^=\s]+)\s*(((?P<one>[+\-*/%]{2})\s*)|(?P<two>[+\-*/%]=\s*\d+\s*))\s*\)'
+                      r'{(?P<stmt>[\s\S]+|[\s]*)}', re.I)
 loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
                         r'(?P<op>==|!=|>=|<=|>|<)\s*'
                         r'[0-9.]+\s*\)?:$', re.I)
@@ -32,6 +38,38 @@ loop_while = re.compile(r'while\s*\(?(True|False|[a-z]+[0-9_]*[a-z]*)\s*'
 
 
 # region methods
+def for_loop(entry):
+    # entry = code
+    if entry.endswith('}'):
+        if re.search(loop_for, entry):
+            tmp = re.match(loop_for, entry) if re.search(loop_for, entry) else None
+            v1 = v2 = v3 = n1 = n2 = None
+            if tmp:
+                if tmp.group('v1') and not variable(tmp.group('v1')):
+                    v1 = tmp.group('v1')
+                elif tmp.group('v11') and not variable(tmp.group('v11')):
+                    v1 = tmp.group('v11')
+                    if db.get(v1):
+                        v1 = db[v1][1]
+                    else:
+                        print(f"{er} {P}:: {v1}{W} undefined variable")
+                v2, v3 = tmp.group('v2'), tmp.group('v3')
+                n1, n2 = tmp.group('n1'), tmp.group('n2')
+                op = tmp.group('op') if tmp.group('op') in ('=', '<', '>', '<=', '=>', '!=') else None
+                if not v1 == v2 == v3:
+                    print(f"{er} ::{P}({v1}|{v2}|{v3}){W} don't use multi iterable objects in for loop")
+                if not op:
+                    print(f"{er} {P}:: {tmp.group('op')}{W} use valid operands like ({C} = , < , > , <= , >= , != {W})")
+                print(v1, v2, v3, n1, n2, op)
+                until = {'=': 0, '<': -1, '>': 1, '<=': 'equal or smaller than',
+                         '>=': 'equal or greater than', '!=': 'not equal with'}
+                step = tmp.group('two')[0:1] + tmp.group('two')[2:] if tmp.group('two') else tmp.group(8)
+            else:
+                print(er)
+                return True
+            return True
+
+
 def variable(entry):
     if re.match(r'[\-_!@#$%^&*+()=\'".0-9]', entry):
         print(f"{er} {P}:: {entry}{W} don't start variables with {G}'_ 0..9 or symbols'{W}")
@@ -67,17 +105,17 @@ def ssmk(entry):
 
 def mth(entry):
     s1, s2, mul, kind = ssmk(entry)
-    print(s1, mul, s2)
+    # print(s1, mul, s2)
     if mul == '*' and s1 and s2.isnumeric() and kind == 'string':
         print(f"{ok} {P}{entry.group('var')}{W} = {C}{s1*int(s2)}{W}")
         db.update({entry.group('var'): ('string', s1*int(s2))})
     elif mul == '+' and s1 and s2 and kind == 'string':
         print(f"{ok} {P}{entry.group('var')}{W} = {C}{s1+s2}{W}")
         db.update({entry.group('var'): ('string', s1+s2)})
-    elif str(s1).isnumeric() and str(s2).isnumeric() and kind == 'int':
+    elif str(s1).isdigit() and str(s2).isdigit() and kind == 'int':
         print(f"{ok} {P}{entry.group('var')}{W} = {C}{int(eval(str(s1)+str(mul)+str(s2)))}{W}")
         db.update({entry.group('var'): ('int', int(eval(str(s1)+str(mul)+str(s2))))})
-    elif s1 and s2 and kind == 'float':
+    elif s1.isnumeric() and s2.isnumeric() and kind == 'float':
         print(f"{ok} {P}{entry.group('var')}{W} = {C}{float(eval(entry.group('math')))}{W}")
         db.update({entry.group('var'): ('float', float(eval(entry.group('math'))))})
     else:
@@ -87,25 +125,38 @@ def mth(entry):
 
 def if_cond(entry):
     if entry.startswith('if'):
-        if entry.endswith((':', '{')):
+        if entry.endswith('}'):
             if_c = re.search(condition, entry) if re.search(condition, entry) else None
             if if_c:
-                if not db.get(if_c.group('left')):
-                    print(f"{er} {P}:: {if_c.group('left')}{W} undefined variable")
-                elif not if_c.group('op') in ('==', '>=', '<=', '!=', '<', '>'):
-                    print(f"{er} {P}:: {if_c.group('op')}{W} is wrong, use one of these {G}==, >=, <=, !=, >, <{W}")
-                if not db.get(if_c.group('right')):
-                    print(f"{er} {P}:: {if_c.group('right')}{W} undefined variable")
-                elif re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', if_c.group('left')) or \
-                        re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', if_c.group('right')):
-                    left, right = float(if_c.group('left')), float(if_c.group('right'))
+                s1 = s2 = mul = op = None
+                if if_c.group('s12'):
+                    s1 = if_c.group('s12')
+                elif db.get(if_c.group('s13')):
+                    s1 = db[if_c.group('s13')][1]
+                mul = if_c.group('op')
+                if db.get(if_c.group('bv')):
+                    s2 = db[if_c.group('bv')][1]
+                elif if_c.group('bn'):
+                    s2 = str(if_c.group('bn'))
+                if re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', s1) and re.fullmatch(r'(\d*\.\d+|\d+\.\d*|\d+)', s2):
+                    left, right = float(s1), float(s2)
                     op = {'==': 'True' if left == right else 'False', '!=': 'True' if not left == right else 'False',
                           '>=': 'True' if left >= right else 'False', '<=': 'True' if left <= right else 'False',
                           '>': 'True' if left > right else 'False', '<': 'True' if left < right else 'False'}
-                    print(f'{G}{left} {C}{if_c.group(2)} {G}{right}\n{B}{str(op.get(if_c.group(2)))}{W}')
-                elif variable(if_c.group('left')) or variable(if_c.group('right')):
-                    pass
+                    # print(f"{G}{left} {C}{mul} {G}{right}{W}")
+                    # print(f'{B}{str(op.get(mul))}{W}')
+                if op.get(mul) == 'True':
+                    print(if_c.group('stmt'))
+                    if declare(if_c.group('stmt')):
+                        pass
+                    elif equivalent(if_c.group('stmt')):
+                        pass
+                else:
+                    print(f"{G}WARN::{W} condition is False so {P}{if_c.group('stmt')}{W} is unreachable")
                 return True
+        else:
+            print(f'{er} {P}::{code}{W} forgot closing statement')
+            return True
 
 
 def declare(entry):
@@ -269,9 +320,12 @@ def xform(entry):
 
 # event = ('string x = "sina";', 'string y = x*3;', 'string z = x+" rhn";',
 #          'string p;', 'p = x+x;', 'int j = 2*2;', 'float i = 2*3;', 'rt')
+
 # region start
+
+
 i = 0
-print(f'\nif you ever wanted see database type: {C}REPORT{W} or {C}RT{W}')
+print(f'\nif you ever wanted to see database type: {C}REPORT{W} or {C}RT{W}')
 while True:
     # code = event[i].strip()
     code = input(':\t').strip()
@@ -286,22 +340,8 @@ while True:
     elif if_cond(code):
         pass
     # for loop
-    elif code.startswith('for'):
-        if code.endswith(':'):
-            if re.search(loop_for, code):
-                tmp = re.match(loop_for, code)
-                until = {'=': 'equal to', '<': 'smaller than', '>': 'greater than', '<=': 'equal or smaller than',
-                         '>=': 'equal or greater than', '!=': 'not equal with'}
-                step = tmp.group('two')[0:1] + tmp.group('two')[2:] if tmp.group('two') else tmp.group(8)
-                print('{0}OK::{1} int {2}{3}{4} from {2}{5}{4} until {6}{7} {2}{8}{4} step:: {9}{10}{4}'.format(
-                    ok, C, B, tmp.group(1), W, tmp.group(2), R, until.get(tmp.group(4)), tmp.group(5), G, step))
-            else:
-                if not re.search(r'[;]{2}', code[:-1]):
-                    print('{}ERROR::{} not enough semicolon {}{}{} '.format(
-                        er, W, P, ' '.join(code.split()).strip()[3:], W))
-                if not re.search(loop_for, code):
-                    print('{}ERROR::{} check your loop again {}{}{} something is wrong'.format(
-                        er, W, P, ' '.join(code.split()), W))
+    elif for_loop(code):
+        pass
     elif re.fullmatch(r'(report|rt)', code, re.I):
         print(f'\n{P} . . . VARIABLE . . . {W}||{G} . . . . TYPE . . . . {W}||{B}  . . . VALUE . . .  {W}')
         for k, v in db.items():
