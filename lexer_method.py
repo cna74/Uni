@@ -31,10 +31,10 @@ loop_for = re.compile(r'for\s*\(\s*'
                       r'\s*(?P<v2>[^=\s]+)\s*(?P<op>[=<>!]+)\s*(?P<n2>\d+|[^=\s]+)\s*;'
                       r'\s*(?P<v3>[^=\s]+)\s*(((?P<one>[+\-*/%]{2})\s*)|(?P<two>[+\-*/%]=\s*\d+\s*))\s*\)'
                       r'{(?P<stmt>[\s\S]+|\s*)}', re.I)
-loop_while = re.compile(r'while\s*\(\s*((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))'
+loop_while = re.compile(r'while\s*\(\s*(?P<cond>True|((?P<s11>[\"][\S\s]*[\"])|(?P<s12>[\d.]+)|(?P<s13>[^=\s]+))'
                         r'\s*(?P<op>[=<>!]+)\s*'
-                        r'((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+))\s*\)\s*'
-                        r'{(?P<stmt>[\s\S]+|\s*)}$', re.I)
+                        r'((?P<bs>[\"][\S\s]*[\"])|(?P<bn>[\d]+)|(?P<bv>[^=\s]+))\s*)\)\s*'
+                        r'{(?P<stmt>[\s\S]+|\s*)}', re.I)
 # endregion
 
 
@@ -253,26 +253,33 @@ def while_loop(entry):
         if re.search(loop_while, entry):
             tmp = re.match(loop_while, entry) if re.search(loop_while, entry) else None
             if tmp:
-                s1 = s2 = mul = op = None
-                if tmp.group('s12'):
-                    s1 = tmp.group('s12')
-                elif db.get(tmp.group('s13')):
-                    s1 = db[tmp.group('s13')][1]
-                mul = tmp.group('op')
-                if db.get(tmp.group('bv')):
-                    s2 = db[tmp.group('bv')][1]
-                elif tmp.group('bn'):
-                    s2 = str(tmp.group('bn'))
-                if iscond(s1, s2, mul):
-                    if declare(tmp.group('stmt')):
-                        pass
-                    elif equivalent(tmp.group('stmt')):
-                        pass
-                    else:
+                if str(tmp.group('cond')).lower() == 'true':
+                    print(f"{ok} Infinite loop")
+                    if str(tmp.group('stmt')).strip() == '':
                         print(f"{warn} empty statement!")
                 else:
-                    print(f"{G}WARN::{W} condition is False so {P}::{tmp.group('stmt')}{W} is unreachable")
+                    s1 = s2 = mul = op = None
+                    s1 = tmp.group('s12')
+                    if db.get(tmp.group('s13')):
+                        s1 = db[tmp.group('s13')][1]
+                    mul = tmp.group('op')
+                    if db.get(tmp.group('bv')):
+                        s2 = db[tmp.group('bv')][1]
+                    elif tmp.group('bn'):
+                        s2 = str(tmp.group('bn'))
+                    if iscond(s1, s2, mul):
+                        if declare(tmp.group('stmt')):
+                            pass
+                        elif equivalent(tmp.group('stmt')):
+                            pass
+                        elif str(tmp.group('stmt')).strip() == '':
+                            print(f"{warn} empty statement!")
+                    else:
+                        print(f"{G}WARN::{W} condition is False so {P}::{tmp.group('stmt')}{W} is unreachable")
                 return True
+        else:
+            print('nop')
+            return True
 
 
 def iscond(s1, s2, mul):
@@ -348,41 +355,35 @@ def xform(entry):
         ppp = int((21 - len(str(entry))) / 2)
     lll = '_' * ppp
     return lll + str(entry) + lll if len(str(entry)) % 2 == 0 else lll + str(entry) + lll + '_'
-
-
 # endregion
-
-# event = ('string x = "sina";', 'string y = x*3;', 'string z = x+" rhn";',
-#          'string p;', 'p = x+x;', 'int j = 2*2;', 'float i = 2*3;', 'rt')
 
 # region start
 
 
-i = 0
-print(f'\nif you ever wanted to see database type: {C}REPORT{W} or {C}RT{W}')
-while True:
-    # code = event[i].strip()
-    code = ' '.join(input(':\t').split())
-    # print(i+1, code, end='\n')
-    # define
-    if declare(code):
-        pass
-    # equal
-    elif equivalent(code):
-        pass
-    # if condition
-    elif code.startswith('if'):
-        if_cond(code)
-    # for loop
-    elif code.startswith('for'):
-        for_loop(code)
-    elif code.startswith('while'):
-        while_loop(code)
-    elif re.fullmatch(r'(report|rt)', code, re.I):
-        print(f'\n{P} . . . VARIABLE . . . {W}||{G} . . . . TYPE . . . . {W}||{B}  . . . VALUE . . .  {W}')
-        for k, v in db.items():
-            print(f'{P}{xform(k)}{G}  {xform(v[0])}{B}  {xform(v[1])}{W}')
-    else:
-        print(f'{er} unknown token {P}{code}{W}please start with a valid token')
-    i += 1
+if __name__ == '__main__':
+    i = 0
+    print(f'\nif you ever wanted to see database type: {C}REPORT{W} or {C}RT{W}')
+    while True:
+        code = input(':\t')
+        # define
+        if declare(code):
+            pass
+        # equal
+        elif equivalent(code):
+            pass
+        # if condition
+        elif code.startswith('if'):
+            if_cond(code)
+        # for loop
+        elif code.startswith('for'):
+            for_loop(code)
+        elif code.startswith('while'):
+            while_loop(code)
+        elif re.fullmatch(r'(report|rt)', code, re.I):
+            print(f'\n{P} . . . VARIABLE . . . {W}||{G} . . . . TYPE . . . . {W}||{B}  . . . VALUE . . .  {W}')
+            for k, v in db.items():
+                print(f'{P}{xform(k)}{G}  {xform(v[0])}{B}  {xform(v[1])}{W}')
+        else:
+            print(f'{er} unknown token {P}{code}{W}please start with a valid token')
+        i += 1
 # endregion
